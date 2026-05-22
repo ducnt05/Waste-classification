@@ -372,34 +372,13 @@
         <section class="hero">
             <div class="panel hero-copy">
                 <div class="eyebrow">Computer Vision Waste Classifier</div>
-                <h1>Upload ảnh và nhận kết quả phân loại ngay.</h1>
-                <p class="lede">
-                    Ảnh được lưu vào database cùng kết quả dự đoán. Backend sử dụng pipeline feature engineering từ
-                    notebook của bạn,
-                    nên khi thả đúng file model pickle vào thư mục <strong>storage/app/model</strong> thì web sẽ trả kết
-                    quả trực tiếp.
-                </p>
+                <h1>Trợ lý phân loại rác thải.</h1>
 
-                <div class="stats">
-                    <div class="stat">
-                        <span class="value">128×128</span>
-                        <span class="label">Kích thước ảnh đầu vào theo notebook</span>
-                    </div>
-                    <div class="stat">
-                        <span class="value">129+</span>
-                        <span class="label">Feature vector được tái tạo đúng pipeline</span>
-                    </div>
-                    <div class="stat">
-                        <span class="value">DB + Storage</span>
-                        <span class="label">Lưu ảnh, nhãn và payload dự đoán</span>
-                    </div>
-                </div>
             </div>
 
             <div class="panel form-panel">
                 <h2 class="form-title">Tải ảnh lên</h2>
-                <p class="form-note">Chọn 1 ảnh rác hoặc vật thể để hệ thống phân loại. Ảnh sẽ được lưu lại cho lịch sử
-                    truy vấn.</p>
+                <p class="form-note">Chọn một ảnh để hệ thống phân loại.</p>
 
                 <div class="alerts">
                     @if (session('success'))
@@ -480,9 +459,6 @@
                     $predLabel = $payload['label'] ?? null;
                     $predConfidence = $payload['confidence'] ?? null;
                     $probabilities = $payload['probabilities'] ?? [];
-                    $modelFile = $payload['model_file'] ?? null;
-                    $scalerFile = $payload['scaler_file'] ?? null;
-                    $featureConfig = $payload['feature_config'] ?? null;
                     $classLabels = ['cardboard','glass','metal','paper','plastic'];
                     @endphp
 
@@ -501,10 +477,6 @@
                                     {{ $predConfidence ? number_format($predConfidence * 100, 2) . '%' : 'N/A' }}</div>
                             </div>
 
-                            <div style="min-width:200px;">
-                                <div style="color:var(--muted);font-size:0.86rem">Mô hình</div>
-                                <div style="font-size:0.9rem">{{ $modelFile ?? '-' }} · {{ $scalerFile ?? '-' }}</div>
-                            </div>
                         </div>
 
                         <div style="margin-top:12px">
@@ -529,13 +501,6 @@
                             @endforeach
                         </div>
 
-                        @if ($featureConfig)
-                        <div style="margin-top:12px;color:var(--muted);font-size:0.86rem">
-                            Feature config: HSV bins = {{ $featureConfig['hsv_bins'] ?? 'N/A' }}, HOG =
-                            {{ $featureConfig['use_hog'] ? 'yes' : 'no' }}, GLCM =
-                            {{ $featureConfig['use_glcm'] ? 'yes' : 'no' }}
-                        </div>
-                        @endif
                     </div>
                     @endif
                 </div>
@@ -684,6 +649,9 @@
             const ctx = canvas.getContext('2d');
             ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
+            // Disable button to avoid double submit
+            if (captureBtn) captureBtn.disabled = true;
+
             // Fallback if toBlob is not supported
             if (!canvas.toBlob) {
                 try {
@@ -695,6 +663,9 @@
                     const blob = new Blob([ab], {
                         type: 'image/jpeg'
                     });
+                    // Close camera/modal immediately, then send
+                    stopStream();
+                    if (modal) modal.style.display = 'none';
                     sendBlob(blob);
                 } catch (e) {
                     alert('Không thể tạo ảnh: ' + (e.message || e));
@@ -707,8 +678,12 @@
                 if (!blob) {
                     alert('Không thể tạo ảnh.');
                     console.error('[waste-classifier] toBlob returned null');
+                    if (captureBtn) captureBtn.disabled = false;
                     return;
                 }
+                // Close camera/modal immediately, then send
+                stopStream();
+                if (modal) modal.style.display = 'none';
                 sendBlob(blob);
             }, 'image/jpeg', 0.9);
         });
